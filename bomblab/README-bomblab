@@ -370,7 +370,6 @@ recorded on the scoreboard, which we check at
     http://$SERVER_NAME:$REQUESTD_PORT/scoreboard
 
 Once we're satisfied that everything is OK, we stop the lab
-
     linux> make stop
 
 and then go live:

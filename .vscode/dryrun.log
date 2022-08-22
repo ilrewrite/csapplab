@@ -1,0 +1,6 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/home/cdb/csapplab'
+make: Leaving directory '/home/cdb/csapplab'
+ 
+make: *** No targets specified and no makefile found.  Stop.
+
