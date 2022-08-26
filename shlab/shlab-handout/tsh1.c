@@ -359,10 +359,9 @@ void waitfg(pid_t pid)
     sigemptyset(&prev);
     sigaddset(&mask,SIGCHLD);
     sigprocmask(SIG_SETMASK,&mask,NULL);
-    while(!syn){
+    while(fgpid(jobs)){
         sigsuspend(&prev);
     }
-    syn=0;
     sigprocmask(SIG_SETMASK,&prev,NULL);
     return;
 }
@@ -391,7 +390,6 @@ void sigchld_handler(int sig)
     sigprocmask(SIG_SETMASK,&prev,NULL);
     pid_t tmp_pid;
     int status;
-    if(is_fg){
             while((tmp_pid=waitpid(-1,&status,WNOHANG | WUNTRACED))>0){
                 sigprocmask(SIG_BLOCK,&mask,&prev);
                 if(tmp_pid==is_fg){
@@ -405,18 +403,9 @@ void sigchld_handler(int sig)
                     }else if(WIFEXITED(status)){
                         deletejob(jobs,tmp_pid);
                     }
-                    is_complete=1;
-                    syn=1;
                 }
                 sigprocmask(SIG_SETMASK,&prev,NULL);
             }
-    }else{
-        while((tmp_pid=waitpid(-1,NULL,WNOHANG | WUNTRACED))>0){
-            sigprocmask(SIG_BLOCK,&mask,&prev);
-            deletejob(jobs,tmp_pid);
-            sigprocmask(SIG_SETMASK,&prev,NULL);
-        }
-    }
     errno=tmp;
     return;
 }
@@ -697,7 +686,7 @@ int Fork(){
 int Execve(char* filename,char**argv){
     if(execve(filename,argv,environ)<0){
         printf("%s: Command not found\n",argv[0]);
-        exit(0);
+        _exit(0);
     }
     return 0;
 }
