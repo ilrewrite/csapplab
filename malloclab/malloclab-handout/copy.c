@@ -21,7 +21,7 @@
 #define WORD 4
 #define DORD 8
 #define CHUNKSIZE (1<<12)
-#define LIST_NUM 18
+#define LIST_NUM 16
 
 
 #define PACK(x,y) ((x)|(y))
@@ -85,7 +85,7 @@ int get_list_index(int size){
   if(size&0x000000f0) {result += 4; size >>= 4; }  
   if(size&0x0000000c) {result += 2; size >>= 2; }  
   if(size&0x00000002) {result += 1; size >>= 1; }  
-  if(result>=LIST_NUM) {return LIST_NUM-1;}
+  if(result>=(1<<(LIST_NUM+1))) {return LIST_NUM-1;}
   return result-2; 
 }
 
@@ -130,7 +130,7 @@ void *mm_malloc(size_t size)                //注意，分配块和空闲块的�
     }else{
         size=((size+DORD-1)/DORD)<<3;
     }
-    return find_fit(size/WORD);
+    return find_fit(size);
 }
 
 /*
@@ -161,30 +161,12 @@ void mm_free(void *ptr)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-    int other_size=GETSIZE(HEAD(ptr))-DORD;
-    int c_size=((size+DORD-1)/DORD<<3);
-    if(other_size>=c_size){
-        if(other_size-size<2*DORD){
-            return ptr;
-        }else{
-            cut_two(ptr,c_size+DORD);
-            return ptr;
-        }
-    }
-    else if((!ALLOCED(HEAD(NEXT(ptr))))&&((GETSIZE(HEAD(NEXT(ptr)))+other_size>=c_size))){
-        int newsize=GETSIZE(HEAD(ptr))+GETSIZE(HEAD(NEXT(ptr)));
-        delete_list(NEXT(ptr));
-        PUT(HEAD(ptr),PACK(newsize,0));
-        PUT(TAIL(ptr),PACK(newsize,0));
-        if(!cut_two(ptr,c_size+DORD)){
-            PUT(HEAD(ptr),PACK(newsize,1));
-            PUT(TAIL(ptr),PACK(newsize,1));
-        }
-        return ptr;
-    }
     char* p=mm_malloc(size);
+    int other_size=GETSIZE(HEAD(ptr))-DORD;
     size=size<other_size?size:other_size;
-    memcpy(p,ptr,size);
+    for(int i=0;i<size;i++){
+        p[i]=((char*)ptr)[i];
+    }
     mm_free(ptr);
     return p;
 }
@@ -217,7 +199,7 @@ void* mem_extend(int size){         //这里的size单位是字
     // printf("after put\n");
     ptr=join(ptr);
     // printf("after join\n");
-    add_list(ptr,GETSIZE(HEAD(ptr))/WORD);
+    add_list(ptr,tmp);
     // printf("end of extend\n");
     return ptr;
 }
@@ -238,8 +220,8 @@ void* find_fit(int size){   //单位为字
                 delete_list(tmp);
                 if(!cut_two(tmp,size)){
                     // printf("pos3 of fit\n");
-                    PUT(HEAD(tmp),PACK(GETSIZE(HEAD(tmp)),1));
-                    PUT(TAIL(tmp),PACK(GETSIZE(HEAD(tmp)),1));
+                    PUT(HEAD(tmp),PACK(size,1));
+                    PUT(TAIL(tmp),PACK(size,1));
                 }
                 // printf("end of fit\n");
                 return tmp;
@@ -248,7 +230,7 @@ void* find_fit(int size){   //单位为字
         }
     }
     // printf("mid of fit\n");
-    int c_size=(size>CHUNKSIZE?size:CHUNKSIZE)/WORD;
+    int c_size=(size>CHUNKSIZE?size:CHUNKSIZE);
     void* ptr;
     if(!(ptr=mem_extend(c_size))){
         printf("mem_extend error\n");
@@ -259,8 +241,8 @@ void* find_fit(int size){   //单位为字
     // printf("pos2 of fit\n");
     if(!cut_two(ptr,size)){
         // printf("pos3 of fit\n");
-        PUT(HEAD(ptr),PACK(GETSIZE(HEAD(ptr)),1));
-        PUT(TAIL(ptr),PACK(GETSIZE(HEAD(ptr)),1));
+        PUT(HEAD(ptr),PACK(c_size,1));
+        PUT(TAIL(ptr),PACK(c_size,1));
     }
     // printf("end of fit\n");
     return ptr;
@@ -275,16 +257,13 @@ void add_list(char* elem,int size){
     int index=get_list_index(size);         //这里size单位是字
     // printf("%d\n",index);
     // printf("pos1 of add\n");
-    PUT(NEXT_PTR(elem),GET(list+index));
+    PUT(NEXT_PTR(elem),list[index]);
     if(list[index]){
-        // printf("%d\n",index);
-        // printf("%x\n",GET(list+index));
-        // printf("%x\n",PRE_PTR(GET(list+index)));
-        PUT(PRE_PTR(GET(list+index)),elem);
+        PUT(PRE_PTR(list[index]),elem);
     }
     // printf("pos2 of add\n");
-    PUT(list+index,elem);
-    PUT(PRE_PTR(elem),list+index);
+    PUT(&list[index],elem);
+    PUT(PRE_PTR(elem),&list[index]);
     // printf("%x\n",PRE_PTR(elem));
     // printf("%x\n",GET(elem));
     // printf("end of add\n");
@@ -349,8 +328,8 @@ void delete_list(char*elem){
         }else{
             PUT(NEXT_PTR(GET(PRE_PTR(elem))),tmp);
         }
-        // PUT(PRE_PTR(elem),NULL);
-        // PUT(NEXT_PTR(elem),NULL);
+        PUT(PRE_PTR(elem),NULL);
+        PUT(NEXT_PTR(elem),NULL);
         // printf("end of delete\n");
     return;
 }
